@@ -1,0 +1,12 @@
+azure-functions
+requests
+azure-identity
+azure-mgmt-keyvault
+azure-keyvault-secrets
+azure-mgmt-compute
+azure-mgmt-storage
+azure-mgmt-resource
+azure-storage-queue
+azure-mgmt-authorization
+azure-core
+requests
