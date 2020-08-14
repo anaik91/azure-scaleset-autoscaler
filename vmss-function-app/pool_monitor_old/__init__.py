@@ -1,16 +1,17 @@
 import logging
+import os,sys
+import azure.functions as func
+"""
 #from azure.identity import DefaultAzureCredential
 from __app__.pool_monitor.cred_wrapper import CredentialWrapper
 from azure.mgmt.compute import ComputeManagementClient
-import azure.functions as func
-import os,sys
 from azure.mgmt.storage import StorageManagementClient
 from azure.storage.queue import QueueClient
 
 #credential = DefaultAzureCredential()
 credential = CredentialWrapper()
 
-"""
+
 subscription_id = os.getenv('ARM_SUBSCRIPTION_ID')
 resource_group = os.getenv('resource_group')
 vmss_name = os.getenv('vmss_name')
@@ -53,3 +54,6 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
+    logging.info('{}'.format(os.environ))
+
+    return func.HttpResponse("Response ==> {}".format(req.))
