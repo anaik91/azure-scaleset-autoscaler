@@ -1,4 +1,14 @@
-"""
+#from azure.keyvault.secrets import SecretClient
+#from __app__.mp_pool_monitor.cred_wrapper import CredentialWrapper
+import requests,base64
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from jinja2 import Template
+import os
+#credential = CredentialWrapper()
+import logging
+
+cloud_init_template="""
 #cloud-config
 users:
   - name: concourseci
@@ -62,3 +72,77 @@ runcmd:
   - sudo /bin/sh /opt/autoscale/files/monit_setup.sh
   - sudo rm -rf /opt/autoscale/python/silent_config
 """
+template = Template(cloud_init_template)
+
+def get_auth_token(username,password):
+    auth_token = base64.b64encode('{}:{}'.format(username,password).encode('utf-8'))
+    auth_token = 'Basic {}'.format(auth_token.decode('utf-8'))
+    return auth_token
+
+def get_apigee_region(baseUrl,auth_token):
+    headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'Authorization': auth_token
+    }
+    response = requests.get(baseUrl+"/v1/regions",headers=headers,verify=False)
+    regions = response.json()
+    if len(regions) > 0:
+        return regions[0]
+    else:
+        None
+  
+def get_apigee_mp_pod(baseUrl,auth_token,region):
+    headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'Authorization': auth_token
+    }
+    response = requests.get("{}/v1/regions/{}/pods".format(baseUrl,region),headers=headers,verify=False)
+    mp_pod = [i for i in response.json() if 'gateway' in i]
+    if len(mp_pod) >0 :
+        return mp_pod[0]
+    else:
+        return None
+"""
+def fetch_secrets(vault_url):
+    client = SecretClient(vault_url=vault_url, credential=credential)
+    data = {
+    'sshpublickey': client.get_secret('sshpublickey').value,
+    'mspassword' : client.get_secret('mspassword').value,
+    'msusername' : client.get_secret('msusername').value,
+    'dynatraceapitoken' : client.get_secret('dynatraceapitoken').value
+    }
+    return data
+"""
+
+def get_user_data(storage_account):
+    apigee_auth_token = get_auth_token(os.getenv("user_name"),os.getenv("password"))
+    apigee_base_url = 'https://{}'.format(os.getenv("ms_ip"))
+    apigee_region = get_apigee_region(apigee_base_url,apigee_auth_token)
+    apigee_mp_pod = get_apigee_mp_pod(apigee_base_url,apigee_auth_token,apigee_region)
+    print('\nApigee Details : \n Region: {} \n Pod : {}'.format(apigee_region,apigee_mp_pod))
+    user_data = template.render(
+        public_key_data = os.getenv("sshpublickey"),
+        protocol = os.getenv("protocol"),
+        port = os.getenv("port"),
+        ms_ip = os.getenv("ms_ip"),
+        username = os.getenv("user_name"),
+        password = os.getenv("password"),
+        region = apigee_region,
+        pod = apigee_mp_pod,
+        dynatrace_api_url = os.getenv("dynatraceapiurl"),
+        dynatrace_api_token = os.getenv("dynatraceapitoken"),
+        storage_account = storage_account,
+        component = 'mp',
+        component_group = 'mp',
+        component_name = 'message-processor',
+        uuid_port = 8082,
+        uuid_retry = 3
+    )
+    logging.info('User data: \n{}'.format(user_data))
+    user_data_b64 = base64.b64encode(user_data.encode('utf-8'))
+
+    #print('\nUser Data Base 64: \n{}'.format(user_data_b64.decode('utf-8')))
+    logging.info('User data b64 : \n{}'.format(user_data_b64.decode('utf-8')))
+    return user_data_b64.decode('utf-8')

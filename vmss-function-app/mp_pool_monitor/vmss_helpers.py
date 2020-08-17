@@ -1,5 +1,8 @@
 import requests,sys,os,uuid
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from __app__.mp_pool_monitor.cred_wrapper import CredentialWrapper
+from __app__.mp_pool_monitor.build_user_data import get_user_data
 from azure.common.credentials import ServicePrincipalCredentials
 from azure.mgmt.compute import ComputeManagementClient
 from azure.identity import DefaultAzureCredential
@@ -10,9 +13,20 @@ from azure.mgmt.compute.models import VirtualMachineScaleSet
 from azure.mgmt.compute.models import VirtualMachineScaleSetVMProfile
 from azure.mgmt.compute.models import VirtualMachineScaleSetOSProfile
 from azure.mgmt.compute.models import VirtualMachineScaleSetStorageProfile
+from azure.mgmt.compute.models import VirtualMachineScaleSetIdentity
 from azure.mgmt.compute.models import ImageReference
+from azure.mgmt.compute.models import Sku
+from azure.mgmt.compute.models import VirtualMachineScaleSetExtensionProfile
+from azure.mgmt.compute.models import VirtualMachineScaleSetExtension
 from azure.mgmt.authorization.models import RoleAssignmentCreateParameters
 from azure.mgmt.keyvault import KeyVaultManagementClient
+from azure.mgmt.storage import StorageManagementClient
+from azure.mgmt.storage.models import AccountSasParameters
+from azure.mgmt.monitor import MonitorManagementClient
+from azure.mgmt.monitor.models import AutoscaleSettingResource
+from azure.mgmt.monitor.models import AutoscaleProfile
+from azure.mgmt.monitor.models import ScaleRule
+from azure.mgmt.monitor.models import MetricTrigger
 
 subscriptionId = os.getenv('WEBSITE_OWNER_NAME').split('+')[0]
 credentials = CredentialWrapper()
@@ -22,6 +36,172 @@ networkClient = NetworkManagementClient(credentials,subscriptionId)
 auth_client = AuthorizationManagementClient(credentials, subscriptionId)
 kv_client = KeyVaultManagementClient(credentials,subscriptionId)
 resource_client = ResourceManagementClient(credentials, subscriptionId)
+storage_client = StorageManagementClient(credentials,subscriptionId)
+monitor_client = MonitorManagementClient(credentials,subscriptionId)
+
+
+def get_sas_token(resourceGroupName,storageAccount):
+    expiry=datetime.utcnow() + relativedelta(years=20)
+    SasParameters = AccountSasParameters(
+        services='bqft',
+        resource_types='sco',
+        permissions='rwdlacup',
+        protocols='https',
+        shared_access_expiry_time=expiry
+    )
+    SasData = storage_client.storage_accounts.list_account_sas(
+        resource_group_name=resourceGroupName,
+        account_name=storageAccount,
+        parameters= SasParameters
+    )
+    sas_token = SasData.account_sas_token
+    return sas_token
+
+def create_autoscaling_settings(ExistingVmScaleSetName,VmScaleSetID,resourceGroupName):
+    NewVmScaleSetName = VmScaleSetID.split('/')[-1]
+    existing_asg = monitor_client.autoscale_settings.get(
+        resource_group_name=resourceGroupName,
+        autoscale_setting_name=ExistingVmScaleSetName)    
+    rules = [ ScaleRule(
+                metric_trigger=MetricTrigger(
+                    metric_name =i.metric_trigger.metric_name,
+                    #metric_namespace=i.metric_trigger.additional_properties['metricNamespace'],
+                    metric_resource_uri = VmScaleSetID,
+                    time_grain = i.metric_trigger.time_grain,
+                    statistic = i.metric_trigger.statistic,
+                    time_window = i.metric_trigger.time_window,
+                    time_aggregation = i.metric_trigger.time_aggregation,
+                    operator = i.metric_trigger.operator,
+                    threshold = i.metric_trigger.threshold
+                    #dimensions = i.metric_trigger.additional_properties['dimensions'] 
+                ),
+                scale_action=i.scale_action) for i in existing_asg.profiles[0].rules  
+        ]
+    profile = AutoscaleProfile(
+        name = existing_asg.profiles[0].name,
+        capacity = existing_asg.profiles[0].capacity,
+        rules = rules,
+        fixed_date = None,
+        recurrence = None
+    )
+    parameters = AutoscaleSettingResource(
+        location = existing_asg.location ,
+        tags = existing_asg.tags ,
+        profiles = [profile],
+        notifications = existing_asg.notifications,
+        enabled = True,
+        autoscale_setting_resource_name = NewVmScaleSetName,
+        target_resource_uri = VmScaleSetID
+    )
+    new_asg = monitor_client.autoscale_settings.create_or_update(
+        resource_group_name= resourceGroupName,
+        autoscale_setting_name = NewVmScaleSetName,
+        parameters = parameters
+    )
+
+
+def clone_vmss(vmScaleSetName,resourceGroupName,count):
+    vmss_data = computeclient.virtual_machine_scale_sets.get(resourceGroupName,vmScaleSetName)
+    StorageAccount = vmss_data.virtual_machine_profile.extension_profile.extensions[0].settings['StorageAccount']
+    custom_data = get_user_data(StorageAccount)
+    sku = Sku(
+        name = vmss_data.sku.name,
+        tier = vmss_data.sku.tier,
+        capacity = 0
+    )
+    os_profile = VirtualMachineScaleSetOSProfile(
+        computer_name_prefix=vmss_data.virtual_machine_profile.os_profile.computer_name_prefix + str(count + 1),
+        admin_username=vmss_data.virtual_machine_profile.os_profile.admin_username,
+        windows_configuration= None,
+        linux_configuration=vmss_data.virtual_machine_profile.os_profile.linux_configuration,
+        custom_data=custom_data)
+    virtual_machine_profile = VirtualMachineScaleSetVMProfile(
+        os_profile=os_profile,
+        storage_profile=vmss_data.virtual_machine_profile.storage_profile,
+        #additional_capabilities=vmss_data.virtual_machine_profile.additional_capabilities,
+        network_profile=vmss_data.virtual_machine_profile.network_profile,
+        diagnostics_profile=vmss_data.virtual_machine_profile.diagnostics_profile
+    )
+    new_vmss_parameters = VirtualMachineScaleSet(
+        location=vmss_data.location,
+        tags=vmss_data.tags,
+        sku=sku,
+        plan=vmss_data.plan,
+        upgrade_policy=vmss_data.upgrade_policy,
+        virtual_machine_profile=virtual_machine_profile,
+        overprovision=vmss_data.overprovision,
+        do_not_run_extensions_on_overprovisioned_vms=vmss_data.do_not_run_extensions_on_overprovisioned_vms,
+        single_placement_group=vmss_data.single_placement_group,
+        zone_balance=vmss_data.zone_balance,
+        platform_fault_domain_count=vmss_data.platform_fault_domain_count,
+        identity = VirtualMachineScaleSetIdentity(type='SystemAssigned'),
+        zones=vmss_data.zones
+    )
+    new_vm_scale_set=vmScaleSetName[:-1] + str(count + 1)
+    new_vmss = computeclient.virtual_machine_scale_sets.create_or_update(
+        resource_group_name=resourceGroupName,
+        vm_scale_set_name=new_vm_scale_set,
+        parameters=new_vmss_parameters
+        )
+    new_vmss.wait()
+    new_vmss_data = new_vmss.result()
+    new_vmss_id = new_vmss_data.id
+    assign_role(new_vmss_id,'Owner',new_vmss_data.identity.principal_id)
+    extension_settings = vmss_data.virtual_machine_profile.extension_profile.extensions[0].settings
+    extension_settings['ladCfg']['diagnosticMonitorConfiguration']['metrics']['resourceId'] = new_vmss_id
+    sas_token = get_sas_token(resourceGroupName,StorageAccount)
+    protected_settings = {
+        'storageAccountName': StorageAccount,
+        'storageAccountSasToken': sas_token
+    }
+
+    extension_profile=VirtualMachineScaleSetExtensionProfile(
+        extensions=[
+            VirtualMachineScaleSetExtension(
+                name=vmss_data.virtual_machine_profile.extension_profile.extensions[0].name,
+                force_update_tag=vmss_data.virtual_machine_profile.extension_profile.extensions[0].force_update_tag,
+                publisher=vmss_data.virtual_machine_profile.extension_profile.extensions[0].publisher,
+                #type1=vmss_data.virtual_machine_profile.extension_profile.extensions[0].type,
+                type=vmss_data.virtual_machine_profile.extension_profile.extensions[0].type,
+                type_handler_version=vmss_data.virtual_machine_profile.extension_profile.extensions[0].type_handler_version,
+                auto_upgrade_minor_version=vmss_data.virtual_machine_profile.extension_profile.extensions[0].auto_upgrade_minor_version,
+                settings=extension_settings,
+                protected_settings=protected_settings,
+                provision_after_extensions=vmss_data.virtual_machine_profile.extension_profile.extensions[0].provision_after_extensions
+            )]
+    )
+    update_virtual_machine_profile = VirtualMachineScaleSetVMProfile(extension_profile=extension_profile)
+    update_parameters = VirtualMachineScaleSet(
+        location=vmss_data.location,
+        virtual_machine_profile=update_virtual_machine_profile)
+    new_vmss_update = computeclient.virtual_machine_scale_sets.create_or_update(
+        resource_group_name=resourceGroupName,
+        vm_scale_set_name=new_vm_scale_set,
+        parameters=update_parameters)
+    new_vmss_update.wait()
+
+    #############
+    """
+    updatedsku = Sku(
+        name = vmss_data.sku.name,
+        tier = vmss_data.sku.tier,
+        capacity = 2
+    )
+    updated_vmss_parameters = VirtualMachineScaleSet(
+        location=vmss_data.location,
+        sku=updatedsku
+    )
+    new_vmss = computeclient.virtual_machine_scale_sets.create_or_update(
+        resource_group_name=resourceGroupName,
+        vm_scale_set_name=new_vm_scale_set,
+        parameters=updated_vmss_parameters
+        )
+    new_vmss.wait()
+    """
+    #############
+    create_autoscaling_settings(vmScaleSetName,new_vmss_id,resourceGroupName)
+
+
 
 def get_vmss_ip_list(vmScaleSetName,resourceGroupName):
     ip_list = []

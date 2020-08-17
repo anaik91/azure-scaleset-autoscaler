@@ -3,11 +3,13 @@ requests
 azure-identity
 azure-mgmt-keyvault
 azure-keyvault-secrets
-azure-mgmt-compute
+azure-mgmt-compute==4.6.2
 azure-mgmt-network
 azure-mgmt-storage
+azure-mgmt-monitor
 azure-mgmt-resource
 azure-storage-queue
 azure-mgmt-authorization
 azure-core
 requests
+jinja2

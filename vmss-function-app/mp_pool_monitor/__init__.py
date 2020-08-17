@@ -1,6 +1,6 @@
 import datetime
 import logging
-from __app__.mp_pool_monitor.vmss_helpers import get_mp_scale_sets,get_vmss_ip_list
+from __app__.mp_pool_monitor.vmss_helpers import get_mp_scale_sets,get_vmss_ip_list,clone_vmss
 from __app__.mp_pool_monitor.apigee_util_methods import get_uuid_from_ip,get_mp_proxy_count
 import os
 import azure.functions as func
@@ -36,7 +36,7 @@ def check_vmss(vmss_uuid_map,ProxyCountThreshold):
 
 
 def main(mytimer: func.TimerRequest) -> None:
-    ProxyCountThreshold = 1000
+    ProxyCountThreshold = int(os.getenv("ProxyCountThreshold"))
     protocol = os.getenv("protocol")
     port = os.getenv("port")
     ms_ip = os.getenv("ms_ip")
@@ -61,15 +61,23 @@ def main(mytimer: func.TimerRequest) -> None:
         uuid_list = []
         for each_ip in ip_list:
             uuid = get_uuid_from_ip(baseUrl,username,password,pod,compType,region,each_ip)
-            uuid_list.append(uuid)
-        proxy_count = get_mp_proxy_count(baseUrl,username,password,uuid_list[0])
-        mp_scale_sets['vmss'][index]['uuid_list'] = uuid_list
-        mp_scale_sets['vmss'][index]['ip_list'] = ip_list
-        mp_scale_sets['vmss'][index]['proxy_count'] = proxy_count
-        index += 1
+            if uuid is not None:
+                uuid_list.append(uuid)
+        if len(uuid_list) > 0:
+            proxy_count = get_mp_proxy_count(baseUrl,username,password,uuid_list[0])
+            mp_scale_sets['vmss'][index]['uuid_list'] = uuid_list
+            mp_scale_sets['vmss'][index]['ip_list'] = ip_list
+            mp_scale_sets['vmss'][index]['proxy_count'] = proxy_count
+            index += 1
+        else:
+            mp_scale_sets['vmss'][index]['proxy_count'] = 0
     vmss_uuid_map ={ i['name']: {'proxy_count': i['proxy_count']} for i in mp_scale_sets['vmss']}
     createVMssFlag,active_vmss = check_vmss(vmss_uuid_map,ProxyCountThreshold)
     logging.info('mp_scale_sets {}'.format(mp_scale_sets))
     logging.info('active_vmss =====> {}'.format(active_vmss))
     logging.info('createVMssFlag =====> {}'.format(createVMssFlag))
+    count = len(mp_scale_sets['vmss'])
+    if createVMssFlag:
+        logging.info('Creating new VM Scale se')
+        clone_vmss(active_vmss,resource_group,count)
     logging.info('Python timer trigger function ran at %s', utc_timestamp)
