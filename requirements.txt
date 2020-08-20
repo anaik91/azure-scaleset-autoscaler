@@ -4,9 +4,12 @@ azure-identity
 azure-mgmt-keyvault
 azure-keyvault-secrets
 azure-mgmt-compute
+azure-mgmt-network
+azure-mgmt-web
 azure-mgmt-storage
 azure-mgmt-resource
 azure-storage-queue
 azure-mgmt-authorization
 azure-core
 requests
+jinja2
