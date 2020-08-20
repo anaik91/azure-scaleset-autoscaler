@@ -6,7 +6,8 @@ import os
 import time
 import azure.functions as func
 from azure.mgmt.compute import ComputeManagementClient
-from azure.mgmt.compute.v2020_06_01.models import VirtualMachineScaleSet
+#from azure.mgmt.compute.v2020_06_01.models import VirtualMachineScaleSet
+from azure.mgmt.compute.models import VirtualMachineScaleSet
 
 def get_vmss_data(client,vmScaleSetName,resourceGroupName):
     vmScaleSetData = client.virtual_machine_scale_sets.get(resource_group_name=resourceGroupName,

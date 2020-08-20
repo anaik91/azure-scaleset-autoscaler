@@ -1,4 +1,5 @@
 import requests,sys,os,uuid
+import logging
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from __app__.mp_pool_monitor.cred_wrapper import CredentialWrapper
@@ -57,6 +58,14 @@ def get_sas_token(resourceGroupName,storageAccount):
     sas_token = SasData.account_sas_token
     return sas_token
 
+def get_storage_account_info(resourceGroupName,storageAccount):
+    storageData = storage_client.storage_accounts.get_properties(
+        resource_group_name=resourceGroupName,
+        account_name=storageAccount
+    )
+    storageAccount = storageData.id
+    return storageAccount
+
 def create_autoscaling_settings(ExistingVmScaleSetName,VmScaleSetID,resourceGroupName):
     NewVmScaleSetName = VmScaleSetID.split('/')[-1]
     existing_asg = monitor_client.autoscale_settings.get(
@@ -101,8 +110,11 @@ def create_autoscaling_settings(ExistingVmScaleSetName,VmScaleSetID,resourceGrou
 
 
 def clone_vmss(vmScaleSetName,resourceGroupName,count):
+    logging.info("Collectiong Data from VM Scale Set {}" .format(vmScaleSetName))
     vmss_data = computeclient.virtual_machine_scale_sets.get(resourceGroupName,vmScaleSetName)
     StorageAccount = vmss_data.virtual_machine_profile.extension_profile.extensions[0].settings['StorageAccount']
+    logging.info("Fetching  Data from Storage Account {}" .format(StorageAccount))
+    StorageAccountId = get_storage_account_info(resourceGroupName,StorageAccount)
     custom_data = get_user_data(StorageAccount)
     sku = Sku(
         name = vmss_data.sku.name,
@@ -138,6 +150,7 @@ def clone_vmss(vmScaleSetName,resourceGroupName,count):
         zones=vmss_data.zones
     )
     new_vm_scale_set=vmScaleSetName[:-1] + str(count + 1)
+    logging.info("Creating VM Scale Set with Name:  {}" .format(new_vm_scale_set))
     new_vmss = computeclient.virtual_machine_scale_sets.create_or_update(
         resource_group_name=resourceGroupName,
         vm_scale_set_name=new_vm_scale_set,
@@ -146,7 +159,12 @@ def clone_vmss(vmScaleSetName,resourceGroupName,count):
     new_vmss.wait()
     new_vmss_data = new_vmss.result()
     new_vmss_id = new_vmss_data.id
-    assign_role(new_vmss_id,'Owner',new_vmss_data.identity.principal_id)
+    new_vmss_principal_id = new_vmss_data.identity.principal_id
+    logging.info("Assiging Role - {} on Scope - {} for Prinicpal - {}".format('Owner',new_vmss_id,new_vmss_principal_id))
+    assign_role(new_vmss_id,'Owner',new_vmss_principal_id)
+    logging.info("Assiging Role - {} on Scope - {} for Prinicpal - {}".format('Storage Blob Data Contributor',StorageAccountId,new_vmss_principal_id))
+    assign_role(StorageAccountId,'Storage Blob Data Contributor',new_vmss_principal_id)
+
     extension_settings = vmss_data.virtual_machine_profile.extension_profile.extensions[0].settings
     extension_settings['ladCfg']['diagnosticMonitorConfiguration']['metrics']['resourceId'] = new_vmss_id
     sas_token = get_sas_token(resourceGroupName,StorageAccount)
@@ -174,6 +192,7 @@ def clone_vmss(vmScaleSetName,resourceGroupName,count):
     update_parameters = VirtualMachineScaleSet(
         location=vmss_data.location,
         virtual_machine_profile=update_virtual_machine_profile)
+    logging.info("Setting Linux Diagnositc Extension on  VM Scale Set :  {}" .format(new_vm_scale_set))
     new_vmss_update = computeclient.virtual_machine_scale_sets.create_or_update(
         resource_group_name=resourceGroupName,
         vm_scale_set_name=new_vm_scale_set,
@@ -199,8 +218,9 @@ def clone_vmss(vmScaleSetName,resourceGroupName,count):
     new_vmss.wait()
     """
     #############
+    logging.info("Creating AutoScale Setting for   VM Scale Set :  {}" .format(new_vm_scale_set))
     create_autoscaling_settings(vmScaleSetName,new_vmss_id,resourceGroupName)
-
+    logging.info("Successfully Cloned VM ScaleSet {} to create {}" .format(vmScaleSetName,new_vm_scale_set))
 
 
 def get_vmss_ip_list(vmScaleSetName,resourceGroupName):

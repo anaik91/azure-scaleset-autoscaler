@@ -28,7 +28,6 @@ write_files:
       RemainAfterExit=true
       ExecStartPre=/bin/sleep 10
       ExecStart=/bin/sudo /bin/python3.6 /opt/autoscale/python/add_uuid.py -w "{{protocol}}" -o "{{port}}" -i "{{ms_ip}}" -e "{{username}}" -p "{{password}}" -r "{{region}}" -n "{{pod}}" -u "{{dynatrace_api_url}}/events" -a "{{dynatrace_api_token}}"
-      ExecStop=/bin/sudo /bin/python3.6 /opt/autoscale/python/remove_uuid.py -w "{{protocol}}" -o "{{port}}" -i "{{ms_ip}}" -e "{{username}}" -p "{{password}}" -r "{{region}}" -n "{{pod}}"
       [Install]
       WantedBy=multi-user.target
     path: /etc/systemd/system/start_stop.service
@@ -110,7 +109,8 @@ def fetch_secrets(vault_url):
     'sshpublickey': client.get_secret('sshpublickey').value,
     'mspassword' : client.get_secret('mspassword').value,
     'msusername' : client.get_secret('msusername').value,
-    'dynatraceapitoken' : client.get_secret('dynatraceapitoken').value
+    'dynatraceapitoken' : client.get_secret('dynatraceapitoken').value,
+    'dynatraceapiurl' : client.get_secret('dynatraceapiurl').value
     }
     return data
 
@@ -130,9 +130,10 @@ def get_user_data(ms_ip,vault_uri,storage_account):
         password = secrets['mspassword'],
         region = apigee_region,
         pod = apigee_mp_pod,
-        dynatrace_api_url = 'https://api.dyn.demo.local',
+        dynatrace_api_url = secrets['dynatraceapiurl'],
         dynatrace_api_token = secrets['dynatraceapitoken'],
         storage_account = storage_account,
+        component = 'mp',
         component_group = 'mp',
         component_name = 'message-processor',
         uuid_port = 8082,
