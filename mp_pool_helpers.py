@@ -281,6 +281,7 @@ def main():
     #sys.exit()
     update_vmss(mp_vmss,resource_group,vmss_data.location,user_data,ImageID)
     print('Successfully Updated MP Scale Set  : {}'.format(mp_vmss))
+    banner()
 
     ###### Function App Update ######
     print('Updating Function App Code : {}'.format(function_app))
@@ -289,6 +290,7 @@ def main():
     run_script('{}/publish_function_app.sh'.format(root_dir))
     print('Finished Updating Function App Code : {}'.format(function_app))
     ###### Function App Update ######
+    banner()
 
 if __name__ == '__main__':
     main()
