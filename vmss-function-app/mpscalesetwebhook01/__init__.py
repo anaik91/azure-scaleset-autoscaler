@@ -46,6 +46,19 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info ("Scale Operation : {}".format(req.get_json()))
     logging.info("Component type received {}".format(req.params.get("compType")))
     scale_operation = req.get_json()
+    if 'schemaId' in scale_operation:
+        if 'Microsoft.Insights/activityLogs' in scale_operation['schemaId']:
+            scale_operation['operation'] = 'Scale In'
+            scale_operation['context'] = {
+                'subscriptionId': scale_operation['data']['context']['activityLog']['subscriptionId'],
+                'resourceGroupName': scale_operation['data']['context']['activityLog']['resourceGroupName'],
+                'resourceName': scale_operation['data']['context']['activityLog']['resourceId'].split('/')[-1],
+                'resourceRegion': os.getenv("Location")
+            }
+        else:
+            pass
+    else:
+        pass
     logging.info("Scale Operation {}".format(scale_operation['operation']))
     protocol = os.getenv("protocol")
     port = os.getenv("port")

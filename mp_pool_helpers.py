@@ -20,7 +20,8 @@ from azure.mgmt.keyvault import KeyVaultManagementClient
 from azure.mgmt.storage import StorageManagementClient
 from azure.mgmt.storage.models import AccountSasParameters
 from azure.mgmt.web import WebSiteManagementClient
-from build_user_data import get_user_data
+from build_user_data import get_user_data,fetch_keyvault_refrences
+from msrestazure.azure_exceptions import CloudError
 import configparser
 root_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -180,9 +181,17 @@ def get_role_definition(scope,role_name):
     return [ i.id for i in role_definitions if i.role_name == role_name][0]
 
 def assign_role(scope,role_name,principal_id):
-    role_definition_id = get_role_definition(scope,role_name)
-    parameters = RoleAssignmentCreateParameters(role_definition_id=role_definition_id,principal_id=principal_id)
-    auth_client.role_assignments.create(scope,str(uuid.uuid4()),parameters=parameters)
+    try:
+        role_definition_id = get_role_definition(scope,role_name)
+        parameters = RoleAssignmentCreateParameters(role_definition_id=role_definition_id,principal_id=principal_id)
+        auth_client.role_assignments.create(scope,str(uuid.uuid4()),parameters=parameters)
+    except CloudError as e:
+        if 'already exists' in e.message:
+            pass
+        else:
+            print('error : {}'.format(e.error))
+            sys.exit()
+
 
 def get_public_ip_address(resource_group,public_ip):
     pip = network_client.public_ip_addresses.get(resource_group,public_ip)
@@ -194,6 +203,10 @@ def get_key_vault_uri(resource_group,key_vault):
 
 def get_resource_group_details(resource_group):
     data = {}
+    rg = resource_client.resource_groups.get(resource_group)
+    rg_id = rg.id
+    data['resource_group'] = {'id':rg_id }
+
     #credential = DefaultAzureCredential()
     #compute = ComputeManagementClient(credentials,subscriptionId)
     #network = NetworkManagementClient(credentials,subscriptionId)
@@ -229,13 +242,16 @@ def get_resource_group_details(resource_group):
     
     return data
 
-
-def update_function_app_propeties(resourceGroupName,functionApp,Key,Value):
+def merge_dict(dict1, dict2):
+    dict2.update(dict1)
+    return(dict2)
+    
+def update_function_app_propeties(resourceGroupName,functionApp,data):
     app_settings = funcapp_client.web_apps.list_application_settings(
         resource_group_name=resourceGroupName,
         name=functionApp)
     existing_properties = app_settings.properties
-    existing_properties[Key] = Value
+    existing_properties = merge_dict(existing_properties,data)
     app_settings_update = funcapp_client.web_apps.update_application_settings(
         resource_group_name=resourceGroupName,
         name=functionApp, 
@@ -272,23 +288,27 @@ def main():
     #print('User Data Base64 Encoded : {}\n'.format(user_data))
     user_data = get_user_data(ms_ip,vault_uri,storage_account)
     banner()
-    #sys.exit()
+    print('Assiging roles to  Function App : {}'.format(function_app))
+    assign_role(data['resource_group']['id'],'Owner',data['function_app']['principal_id'])
+    print('Finished Assiging roles to  Function App : {}'.format(function_app))
+    banner()
+    vault_data = fetch_keyvault_refrences(vault_uri)
+    vault_data['ProxyCountThreshold'] = ProxyCountThreshold
     print('Updating Function App properties : {}'.format(function_app))
-    update_function_app_propeties(resource_group,function_app,'ProxyCountThreshold',ProxyCountThreshold)
+    update_function_app_propeties(resource_group,function_app,vault_data)
     print('Finished Updating Function App properties : {}'.format(function_app))
+    banner()
     vmss_data = get_vmss_data(mp_vmss,resource_group)
     print('Modifying Coustom Data & Image of  MP Scale Set  : {}'.format(mp_vmss))
-    #sys.exit()
     update_vmss(mp_vmss,resource_group,vmss_data.location,user_data,ImageID)
     print('Successfully Updated MP Scale Set  : {}'.format(mp_vmss))
     banner()
-
     ###### Function App Update ######
     print('Updating Function App Code : {}'.format(function_app))
     os.environ['root_dir'] = root_dir
     os.environ['func_app_name'] = function_app
     run_script('{}/publish_function_app.sh'.format(root_dir))
-    print('Finished Updating Function App Code : {}'.format(function_app))
+    print('\nFinished Updating Function App Code : {}'.format(function_app))
     ###### Function App Update ######
     banner()
 

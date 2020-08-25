@@ -103,6 +103,15 @@ def get_apigee_mp_pod(baseUrl,auth_token,region):
     else:
         return None
 
+def fetch_keyvault_refrences(vault_url):
+    client = SecretClient(vault_url=vault_url, credential=credential)
+    data = {
+    'sshpublickey': '@Microsoft.KeyVault(SecretUri={})'.format(client.get_secret('sshpublickey').id),
+    'dynatraceapitoken' : '@Microsoft.KeyVault(SecretUri={})'.format(client.get_secret('dynatraceapitoken').id),
+    'dynatraceapiurl' : '@Microsoft.KeyVault(SecretUri={})'.format(client.get_secret('dynatraceapiurl').id)
+    }
+    return data
+
 def fetch_secrets(vault_url):
     client = SecretClient(vault_url=vault_url, credential=credential)
     data = {
