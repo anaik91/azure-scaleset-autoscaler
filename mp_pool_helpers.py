@@ -251,7 +251,9 @@ def update_function_app_propeties(resourceGroupName,functionApp,data):
         resource_group_name=resourceGroupName,
         name=functionApp)
     existing_properties = app_settings.properties
-    existing_properties = merge_dict(existing_properties,data)
+    #existing_properties = merge_dict(existing_properties,data)
+    for i in data:
+        existing_properties[i] = data[i]
     app_settings_update = funcapp_client.web_apps.update_application_settings(
         resource_group_name=resourceGroupName,
         name=functionApp, 
