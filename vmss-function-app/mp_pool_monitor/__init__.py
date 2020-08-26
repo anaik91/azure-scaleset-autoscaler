@@ -2,6 +2,7 @@ import datetime
 import logging
 from __app__.mp_pool_monitor.vmss_helpers import get_mp_scale_sets,get_vmss_ip_list,clone_vmss
 from __app__.mp_pool_monitor.apigee_util_methods import get_uuid_from_ip,get_mp_proxy_count
+from __app__.mp_pool_monitor.design_time_helpers import update_DT_mp_uuid
 import os
 import azure.functions as func
 
@@ -80,4 +81,10 @@ def main(mytimer: func.TimerRequest) -> None:
     if createVMssFlag:
         logging.info('Creating new VM Scale se')
         clone_vmss(active_vmss,resource_group,count)
+    active_uuids = [i['uuid_list'] for i in mp_scale_sets['vmss'] if i['name'] == active_vmss][0]
+    logging.info('Updating DT with UUIDs {}'.format(active_uuids))
+    if update_DT_mp_uuid(active_uuids):
+        logging.info('Successfully Updated DT with UUIDs')
+    else:
+        logging.info('Failure in Updating DT with UUIDs')
     logging.info('Python timer trigger function ran at %s', utc_timestamp)

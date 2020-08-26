@@ -39,6 +39,7 @@ def handle_dead_uuid(vmss_data,uuid):
             vmScaleSetTags['dead_uuid_list'] = uuid
     except KeyError:
         vmScaleSetTags['dead_uuid_list'] = uuid
+    logging.info('Updating Scale Set : {} with tag dead_uuid_list with value {}'.format(vmScaleSetName,vmScaleSetTags['dead_uuid_list']))
     create_vmss_tag(compute,vmScaleSetName,resourceGroupName,location,vmScaleSetTags)
 
 def main(req: func.HttpRequest) -> func.HttpResponse:

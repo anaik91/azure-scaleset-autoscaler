@@ -20,7 +20,7 @@ from azure.mgmt.keyvault import KeyVaultManagementClient
 from azure.mgmt.storage import StorageManagementClient
 from azure.mgmt.storage.models import AccountSasParameters
 from azure.mgmt.web import WebSiteManagementClient
-from build_user_data import get_user_data,fetch_keyvault_refrences
+from build_user_data import get_user_data,fetch_keyvault_refrences,set_dt_secrets
 from msrestazure.azure_exceptions import CloudError
 import configparser
 root_dir = os.path.dirname(os.path.realpath(__file__))
@@ -267,9 +267,19 @@ def main():
     print('\nPopulating Inputs from "input.propeties" ...\n')
 
     ############### Populating Inputs ###############
+
     Project = config.get('RunTime','Project')
     ProxyCountThreshold = config.get('RunTime','ProxyCountThreshold')
     ImageID = config.get('RunTime','ImageID')
+
+    dt_oauth_host = config.get('DesignTime','dt_oauth_host')
+    dt_oauth_username = config.get('DesignTime','dt_oauth_username')
+    dt_oauth_password = config.get('DesignTime','dt_oauth_password')
+    dt_apiportal_host = config.get('DesignTime','dt_apiportal_host')
+
+    ############### Populating Inputs ###############
+
+    ImageIdResourceGroup = '/'.join(ImageID.split('/')[:5])
     resource_group = Project + '-rg'
     print('\nPopulating Resources from  Resource Group - {}\n'.format(resource_group))
     data = get_resource_group_details(resource_group)
@@ -290,16 +300,31 @@ def main():
     #print('User Data Base64 Encoded : {}\n'.format(user_data))
     user_data = get_user_data(ms_ip,vault_uri,storage_account)
     banner()
-    print('Assiging roles to  Function App : {}'.format(function_app))
+    print('Assiging Resource Group Owner role to  Function App : {}'.format(function_app))
     assign_role(data['resource_group']['id'],'Owner',data['function_app']['principal_id'])
     print('Finished Assiging roles to  Function App : {}'.format(function_app))
+
+    print('Assiging Image Resource Read role to  Function App : {}'.format(function_app))
+    assign_role(ImageIdResourceGroup,'Reader',data['function_app']['principal_id'])
+    print('Finished Assiging roles to  Function App : {}'.format(function_app))
     banner()
+    ###### Azure Vault Set Secrets ######
+    print('Setting Azure Vault Secrets : {}'.format(vault_uri))
+    set_dt_secrets(vault_uri,'dtoauthhost',dt_oauth_host)
+    set_dt_secrets(vault_uri,'dtoauthusername',dt_oauth_username)
+    set_dt_secrets(vault_uri,'dtoauthpassword',dt_oauth_password)
+    set_dt_secrets(vault_uri,'dtapiportalhost',dt_apiportal_host)
+    print('Finished Setting Azure Vault Secrets : {}'.format(vault_uri))
+    ###### Azure Vault Set Secrets ######
+    banner()
+    ###### Function App Update Property ######
     vault_data = fetch_keyvault_refrences(vault_uri)
     vault_data['ProxyCountThreshold'] = ProxyCountThreshold
     print('Updating Function App properties : {}'.format(function_app))
     update_function_app_propeties(resource_group,function_app,vault_data)
     print('Finished Updating Function App properties : {}'.format(function_app))
     banner()
+    ###### Function App Update Property ######
     vmss_data = get_vmss_data(mp_vmss,resource_group)
     print('Modifying Coustom Data & Image of  MP Scale Set  : {}'.format(mp_vmss))
     update_vmss(mp_vmss,resource_group,vmss_data.location,user_data,ImageID)

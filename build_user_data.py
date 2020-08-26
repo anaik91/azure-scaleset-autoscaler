@@ -108,9 +108,19 @@ def fetch_keyvault_refrences(vault_url):
     data = {
     'sshpublickey': '@Microsoft.KeyVault(SecretUri={})'.format(client.get_secret('sshpublickey').id),
     'dynatraceapitoken' : '@Microsoft.KeyVault(SecretUri={})'.format(client.get_secret('dynatraceapitoken').id),
-    'dynatraceapiurl' : '@Microsoft.KeyVault(SecretUri={})'.format(client.get_secret('dynatraceapiurl').id)
+    'dynatraceapiurl' : '@Microsoft.KeyVault(SecretUri={})'.format(client.get_secret('dynatraceapiurl').id),
+    'dynatraceapitoken' : '@Microsoft.KeyVault(SecretUri={})'.format(client.get_secret('dynatraceapitoken').id),
+    'dt_oauth_host' : '@Microsoft.KeyVault(SecretUri={})'.format(client.get_secret('dtoauthhost').id),
+    'dt_oauth_username' : '@Microsoft.KeyVault(SecretUri={})'.format(client.get_secret('dtoauthusername').id),
+    'dt_oauth_password' : '@Microsoft.KeyVault(SecretUri={})'.format(client.get_secret('dtoauthpassword').id),
+    'dt_apiportal_host' : '@Microsoft.KeyVault(SecretUri={})'.format(client.get_secret('dtapiportalhost').id)
     }
     return data
+
+def set_dt_secrets(vault_url,key,value):
+    client = SecretClient(vault_url=vault_url, credential=credential)
+    res = client.set_secret(key,value)
+    return res.id
 
 def fetch_secrets(vault_url):
     client = SecretClient(vault_url=vault_url, credential=credential)
