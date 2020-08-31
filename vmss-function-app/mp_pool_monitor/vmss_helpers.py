@@ -28,6 +28,9 @@ from azure.mgmt.monitor.models import AutoscaleSettingResource
 from azure.mgmt.monitor.models import AutoscaleProfile
 from azure.mgmt.monitor.models import ScaleRule
 from azure.mgmt.monitor.models import MetricTrigger
+from azure.mgmt.monitor.models import ActivityLogAlertResource
+from azure.mgmt.monitor.models import ActivityLogAlertAllOfCondition
+from azure.mgmt.monitor.models import ActivityLogAlertLeafCondition
 
 subscriptionId = os.getenv('WEBSITE_OWNER_NAME').split('+')[0]
 credentials = CredentialWrapper()
@@ -65,6 +68,40 @@ def get_storage_account_info(resourceGroupName,storageAccount):
     )
     storageAccount = storageData.id
     return storageAccount
+
+def clone_activity_log(resourceGroupName,VmScaleSetID):
+    activity_log_alerts = monitor_client.activity_log_alerts.list_by_resource_group(resourceGroupName)
+    existing_mp_activitylog_alerts = [i.name for i in activity_log_alerts if 'mp-alert' in i.name]
+    count = len(existing_mp_activitylog_alerts) + 1
+    existing_mp_activitylog_alert = existing_mp_activitylog_alerts[0]
+    new_mp_activitylog_alert_name = existing_mp_activitylog_alert[:-1] + str(count)
+    existing_alert = monitor_client.activity_log_alerts.get(resourceGroupName,existing_mp_activitylog_alert)
+    condition = ActivityLogAlertAllOfCondition(
+        all_of = [
+            ActivityLogAlertLeafCondition(
+                field = 'category',
+                equals = 'Administrative'
+            ),
+            ActivityLogAlertLeafCondition(
+                field = 'operationName',
+                equals = 'Microsoft.Compute/virtualMachineScaleSets/delete/action'
+            ),ActivityLogAlertLeafCondition(
+                field = 'resourceId',
+                equals = VmScaleSetID
+            )
+        ]
+    )
+    activity_log_alert = ActivityLogAlertResource(
+            location=existing_alert.location,
+            scopes=existing_alert.scopes,
+            actions=existing_alert.actions,
+            condition=condition
+    )
+    alert = monitor_client.activity_log_alerts.create_or_update(
+        resource_group_name = resourceGroupName,
+        activity_log_alert_name = new_mp_activitylog_alert_name,
+        activity_log_alert = activity_log_alert
+        )
 
 def create_autoscaling_settings(ExistingVmScaleSetName,VmScaleSetID,resourceGroupName):
     NewVmScaleSetName = VmScaleSetID.split('/')[-1]
@@ -220,6 +257,12 @@ def clone_vmss(vmScaleSetName,resourceGroupName,count):
     #############
     logging.info("Creating AutoScale Setting for   VM Scale Set :  {}" .format(new_vm_scale_set))
     create_autoscaling_settings(vmScaleSetName,new_vmss_id,resourceGroupName)
+    
+
+    logging.info("Creating Activity Log Alert for VM Scale Set :  {}" .format(new_vm_scale_set))
+    clone_activity_log(resourceGroupName,new_vmss_id,vmss_data.location)
+    logging.info("Finished Creating Activity Log Alert for VM Scale Set :  {}" .format(new_vm_scale_set))
+
     logging.info("Successfully Cloned VM ScaleSet {} to create {}" .format(vmScaleSetName,new_vm_scale_set))
 
 
