@@ -30,15 +30,21 @@ def handle_dead_uuid(vmss_data,uuid):
     vmScaleSetTags = vmScaleSetData.tags
     try:
         dead_uuid_list = vmScaleSetTags['dead_uuid_list']
-        if len(dead_uuid_list) > 0:
-            dead_uuid_list = dead_uuid_list.split(',')
-            dead_uuid_list.append(uuid)
-            updated_dead_uuid_list = ','.join(set(dead_uuid_list))
-            vmScaleSetTags['dead_uuid_list'] = updated_dead_uuid_list
+        dead_uuid_buffer = vmScaleSetTags['dead_uuid_buffer']
+        if uuid == dead_uuid_buffer:
+            return None
         else:
-            vmScaleSetTags['dead_uuid_list'] = uuid
+            if len(dead_uuid_list) > 0:
+                dead_uuid_list = dead_uuid_list.split(',')
+                dead_uuid_list.append(uuid)
+                updated_dead_uuid_list = ','.join(set(dead_uuid_list))
+                vmScaleSetTags['dead_uuid_list'] = updated_dead_uuid_list
+            else:
+                vmScaleSetTags['dead_uuid_list'] = uuid
+            vmScaleSetTags['dead_uuid_buffer'] = uuid
     except KeyError:
         vmScaleSetTags['dead_uuid_list'] = uuid
+        vmScaleSetTags['dead_uuid_buffer'] = uuid
     logging.info('Updating Scale Set : {} with tag dead_uuid_list with value {}'.format(vmScaleSetName,vmScaleSetTags['dead_uuid_list']))
     create_vmss_tag(compute,vmScaleSetName,resourceGroupName,location,vmScaleSetTags)
 
