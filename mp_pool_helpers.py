@@ -132,7 +132,7 @@ def update_vmss(vmScaleSetName,resourceGroupName,location,custom_data,image_id):
         'storageAccountName': StorageAccount,
         'storageAccountSasToken': sas_token
     }
-
+    print('SAS Token ====> {}'.format(sas_token))
     extension_profile=VirtualMachineScaleSetExtensionProfile(
         extensions=[
             VirtualMachineScaleSetExtension(

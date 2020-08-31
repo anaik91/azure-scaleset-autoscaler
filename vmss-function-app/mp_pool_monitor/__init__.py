@@ -72,6 +72,7 @@ def main(mytimer: func.TimerRequest) -> None:
             index += 1
         else:
             mp_scale_sets['vmss'][index]['proxy_count'] = 0
+            mp_scale_sets['vmss'][index]['uuid_list'] = uuid_list
     vmss_uuid_map ={ i['name']: {'proxy_count': i['proxy_count']} for i in mp_scale_sets['vmss']}
     createVMssFlag,active_vmss = check_vmss(vmss_uuid_map,ProxyCountThreshold)
     logging.info('mp_scale_sets {}'.format(mp_scale_sets))

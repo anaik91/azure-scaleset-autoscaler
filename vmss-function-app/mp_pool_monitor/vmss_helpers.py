@@ -204,7 +204,9 @@ def clone_vmss(vmScaleSetName,resourceGroupName,count):
 
     extension_settings = vmss_data.virtual_machine_profile.extension_profile.extensions[0].settings
     extension_settings['ladCfg']['diagnosticMonitorConfiguration']['metrics']['resourceId'] = new_vmss_id
+    logging.info("Fetching  SAS from Storage Account {}" .format(StorageAccount))
     sas_token = get_sas_token(resourceGroupName,StorageAccount)
+    logging.info("SAS Token : {}" .format(sas_token))
     protected_settings = {
         'storageAccountName': StorageAccount,
         'storageAccountSasToken': sas_token
