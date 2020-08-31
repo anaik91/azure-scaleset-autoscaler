@@ -258,9 +258,8 @@ def clone_vmss(vmScaleSetName,resourceGroupName,count):
     logging.info("Creating AutoScale Setting for   VM Scale Set :  {}" .format(new_vm_scale_set))
     create_autoscaling_settings(vmScaleSetName,new_vmss_id,resourceGroupName)
     
-
     logging.info("Creating Activity Log Alert for VM Scale Set :  {}" .format(new_vm_scale_set))
-    clone_activity_log(resourceGroupName,new_vmss_id,vmss_data.location)
+    clone_activity_log(resourceGroupName,new_vmss_id)
     logging.info("Finished Creating Activity Log Alert for VM Scale Set :  {}" .format(new_vm_scale_set))
 
     logging.info("Successfully Cloned VM ScaleSet {} to create {}" .format(vmScaleSetName,new_vm_scale_set))
