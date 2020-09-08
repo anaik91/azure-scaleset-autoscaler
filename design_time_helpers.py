@@ -1,9 +1,5 @@
-import sys,os
 import requests
-from requests.auth import HTTPBasicAuth
 import json
-from time import time
-from typed_ast.ast3 import Try
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
