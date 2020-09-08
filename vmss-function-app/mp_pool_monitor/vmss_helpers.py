@@ -1,6 +1,6 @@
 import requests,sys,os,uuid
 import logging
-from datetime import datetime
+from datetime import datetime,timedelta
 from dateutil.relativedelta import relativedelta
 from __app__.mp_pool_monitor.cred_wrapper import CredentialWrapper
 from __app__.mp_pool_monitor.build_user_data import get_user_data
@@ -22,6 +22,7 @@ from azure.mgmt.compute.models import VirtualMachineScaleSetExtension
 from azure.mgmt.authorization.models import RoleAssignmentCreateParameters
 from azure.mgmt.keyvault import KeyVaultManagementClient
 from azure.mgmt.storage import StorageManagementClient
+from azure.storage.common import (AccessPolicy, ResourceTypes, AccountPermissions, storageclient, Services, SharedAccessSignature)
 from azure.mgmt.storage.models import AccountSasParameters
 from azure.mgmt.monitor import MonitorManagementClient
 from azure.mgmt.monitor.models import AutoscaleSettingResource
@@ -43,22 +44,30 @@ resource_client = ResourceManagementClient(credentials, subscriptionId)
 storage_client = StorageManagementClient(credentials,subscriptionId)
 monitor_client = MonitorManagementClient(credentials,subscriptionId)
 
+def get_storage_account_keys(resource_group,storage_account):
+    try:
+        storage_acc_info=storage_client.storage_accounts.list_keys(resource_group,storage_account)
+        for keys in storage_acc_info.keys:
+            return keys.value
+    except Exception as ex:
+        print('Exception:')
+        print(ex)
+        sys.exit(1)
 
 def get_sas_token(resourceGroupName,storageAccount):
-    expiry=datetime.utcnow() + relativedelta(years=20)
-    SasParameters = AccountSasParameters(
-        services='bqft',
-        resource_types='sco',
-        permissions='rwdlacup',
-        protocols='https',
-        shared_access_expiry_time=expiry
-    )
-    SasData = storage_client.storage_accounts.list_account_sas(
-        resource_group_name=resourceGroupName,
-        account_name=storageAccount,
-        parameters= SasParameters
-    )
-    sas_token = SasData.account_sas_token
+    #expiry=datetime.utcnow() + relativedelta(years=10)
+    account_key = get_storage_account_keys(resourceGroupName,storageAccount)
+    sas_service_client = SharedAccessSignature(storageAccount, 
+        account_key, 
+        x_ms_version='2018-03-28')
+    protocol = "https"
+    resource_types = ResourceTypes(service=True, container=True, object=True)
+    account_permissions = AccountPermissions(read=True, write=True, delete=True, list=True,add=True, create=True, update=True, process=True, _str=None)
+    expiry = datetime.utcnow() + timedelta(weeks=520)
+    start = None
+    ip = None
+    services = Services(blob=True, queue=True, file=True, table=True, _str=None)
+    sas_token = sas_service_client.generate_account(services, resource_types, account_permissions, expiry, start, ip, protocol)
     return sas_token
 
 def get_storage_account_info(resourceGroupName,storageAccount):

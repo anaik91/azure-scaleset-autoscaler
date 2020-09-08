@@ -1,8 +1,8 @@
 import requests,sys,os,uuid
 import subprocess
-from datetime import datetime
+from datetime import datetime,timedelta
 from dateutil.relativedelta import relativedelta
-from azure.common.credentials import ServicePrincipalCredentials,get_azure_cli_credentials
+from azure.common.credentials import ServicePrincipalCredentials
 from azure.mgmt.compute import ComputeManagementClient
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.network import NetworkManagementClient
@@ -23,6 +23,9 @@ from azure.mgmt.web import WebSiteManagementClient
 from build_user_data import get_user_data,fetch_keyvault_refrences,set_dt_secrets
 from msrestazure.azure_exceptions import CloudError
 import configparser
+from azure.storage.common import (AccessPolicy, ResourceTypes, AccountPermissions, storageclient, Services, SharedAccessSignature)
+#import urllib,base64,hmac,hashlib
+from design_time_helpers import validate_dt_ep
 root_dir = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -62,24 +65,62 @@ def run_script(script_location):
     #args = shlex.split(command)
     output = subprocess.call([script_location])
     return output
-
+        
+def get_storage_account_keys(resource_group,storage_account):
+    try:
+        storage_acc_info=storage_client.storage_accounts.list_keys(resource_group,storage_account)
+        for keys in storage_acc_info.keys:
+            return keys.value
+    except Exception as ex:
+        print('Exception:')
+        print(ex)
+        sys.exit(1)
 
 def get_sas_token(resourceGroupName,storageAccount):
-    expiry=datetime.utcnow() + relativedelta(years=20)
-    SasParameters = AccountSasParameters(
-        services='bqft',
-        resource_types='sco',
-        permissions='rwdlacup',
-        protocols='https',
-        shared_access_expiry_time=expiry
-    )
-    SasData = storage_client.storage_accounts.list_account_sas(
-        resource_group_name=resourceGroupName,
-        account_name=storageAccount,
-        parameters= SasParameters
-    )
-    sas_token = SasData.account_sas_token
+    #expiry=datetime.utcnow() + relativedelta(years=10)
+    account_key = get_storage_account_keys(resourceGroupName,storageAccount)
+    sas_service_client = SharedAccessSignature(storageAccount, 
+        account_key, 
+        x_ms_version='2018-03-28')
+    protocol = "https"
+    resource_types = ResourceTypes(service=True, container=True, object=True)
+    account_permissions = AccountPermissions(read=True, write=True, delete=True, list=True,add=True, create=True, update=True, process=True, _str=None)
+    expiry = datetime.utcnow() + timedelta(weeks=520)
+    start = None
+    ip = None
+    services = Services(blob=True, queue=True, file=True, table=True, _str=None)
+    sas_token = sas_service_client.generate_account(services, resource_types, account_permissions, expiry, start, ip, protocol)
     return sas_token
+
+# def get_sas_token(resourceGroupName,storage_account):
+#     st= str((datetime.utcnow() - timedelta(minutes=5) ).strftime("%Y-%m-%dT%H:%M:%SZ"))
+#     se= str((datetime.utcnow() + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"))
+#     storage_key = get_storage_account_keys(resourceGroupName,storage_account)
+#     inputvalue = "{0}\n{1}\n{2}\n{3}\n{4}\n{5}\n{6}\n{7}\n{8}\n".format(
+#         storage_account,  # 0. account name
+#         'rwdlacup',                   # 1. signed permission (sp)
+#         'bqft',                  # 2. signed service (ss)
+#         'sco',                  # 3. signed resource type (srt)
+#         st,                   # 4. signed start time (st)
+#         se,                   # 5. signed expire time (se)
+#         '',                   # 6. signed ip
+#         'https',              # 7. signed protocol
+#         '2018-03-28').encode('utf-8')  # 8. signed version
+#     # Create base64 encoded signature
+#     hash =hmac.new(base64.b64decode(storage_key),inputvalue,hashlib.sha256).digest()
+#     sig = base64.b64encode(hash)
+#     querystring = {
+#         'sv':  '2018-03-28',
+#         'ss':  'bqft',
+#         'srt': 'sco',
+#         'sp': 'rwdlacup',
+#         'se': se,
+#         'st': st,
+#         'spr': 'https',
+#         'sig': sig,
+#     }
+#     sastoken = urllib.parse.urlencode(querystring)
+#     return sastoken
 
 def get_storage_account_info(resourceGroupName,storageAccount):
     storageData = storage_client.storage_accounts.get_properties(
@@ -201,9 +242,21 @@ def get_key_vault_uri(resource_group,key_vault):
     kv = kv_client.vaults.get(resource_group,key_vault)
     return kv.properties.vault_uri
 
+def validate_resource_by_id(id,api_version):
+    #api_version='2016-08-30'
+    try:
+        resource_client.resources.get_by_id(id,api_version)
+        return True
+    except CloudError:
+        return False
+
+
 def get_resource_group_details(resource_group):
     data = {}
-    rg = resource_client.resource_groups.get(resource_group)
+    try:
+        rg = resource_client.resource_groups.get(resource_group)
+    except CloudError:
+        return None
     rg_id = rg.id
     data['resource_group'] = {'id':rg_id }
 
@@ -283,8 +336,22 @@ def main():
     resource_group = Project + '-rg'
     print('\nPopulating Resources from  Resource Group - {}\n'.format(resource_group))
     data = get_resource_group_details(resource_group)
-    #print(data)
-
+    if data is None:
+        print('Resource Group - {} Not found'.format(resource_group))
+        sys.exit(0)
+    print('Validating ImageID ...\n')
+    if validate_resource_by_id(ImageID,'2016-08-30'):
+        print('ImageID is Valid\n'.format(ImageID))
+        pass
+    else:
+        print('Not a Valid ImageID - {}'.format(ImageID))
+        sys.exit(0)
+    print('Validating Design Time Inputs ...')
+    if validate_dt_ep(dt_oauth_host,dt_apiportal_host,dt_oauth_username,dt_oauth_password):
+        print('Design Time Inputs are Valid\n'.format(ImageID))
+    else:
+        print('Design Time Inputs are NOT Valid\n'.format(ImageID))
+        sys.exit(0)
     ms_ip = get_public_ip_address(resource_group,data['public_ip']['name'])
     vault_uri = get_key_vault_uri(resource_group,data['keyvault']['name'])
     storage_account = data['storage_accounts']['name']
