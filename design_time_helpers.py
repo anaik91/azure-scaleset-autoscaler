@@ -2,13 +2,17 @@ import requests
 import json
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from requests.exceptions import ConnectionError,InvalidURL
 
 
 def get_oauth_token(oath_endpoint,username,password):
-    r = requests.get(oath_endpoint,auth=(username,password),verify=False)
-    if r.status_code == 200:
-        data = json.loads(r.text)
-        return data['access_token']
+    try:
+        r = requests.get(oath_endpoint,auth=(username,password),verify=False)
+        if r.status_code == 200:
+            data = json.loads(r.text)
+            return data['access_token']
+    except (ConnectionError,InvalidURL):
+        return None
 
 def get_mp_XProperty(endpoint,access_token):
     headers = {
@@ -16,14 +20,17 @@ def get_mp_XProperty(endpoint,access_token):
         'Content-Type': 'application/json',
         'Authorization': 'Bearer {}'.format(access_token)
         }
-    r = requests.get(endpoint,verify=False,headers=headers)
-    if r.status_code == 200:
-        data = json.loads(r.text)
-        for each_property in data['d']['results']:
-            if each_property['name'] == 'apiportal.onboarding.apiruntime_prod.mps':
-                return True
-        return False
-    else:
+    try:
+        r = requests.get(endpoint,verify=False,headers=headers)
+        if r.status_code == 200:
+            data = json.loads(r.text)
+            for each_property in data['d']['results']:
+                if each_property['name'] == 'apiportal.onboarding.apiruntime_prod.mps':
+                    return True
+            return False
+        else:
+            return False
+    except (ConnectionError,InvalidURL):
         return False
 
 def validate_dt_ep(dt_oauth_host,dt_apiportal_host,dt_oauth_username,dt_oauth_password):
