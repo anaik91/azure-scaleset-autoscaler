@@ -85,7 +85,7 @@ def clone_activity_log(resourceGroupName,VmScaleSetID):
     existing_mp_activitylog_alert = existing_mp_activitylog_alerts[0]
     new_mp_activitylog_alert_name = existing_mp_activitylog_alert[:-1] + str(count)
     existing_alert = monitor_client.activity_log_alerts.get(resourceGroupName,existing_mp_activitylog_alert)
-    condition = ActivityLogAlertAllOfCondition(
+    condition1 = ActivityLogAlertAllOfCondition(
         all_of = [
             ActivityLogAlertLeafCondition(
                 field = 'category',
@@ -100,16 +100,48 @@ def clone_activity_log(resourceGroupName,VmScaleSetID):
             )
         ]
     )
-    activity_log_alert = ActivityLogAlertResource(
+    condition2 = ActivityLogAlertAllOfCondition(
+        all_of = [
+            ActivityLogAlertLeafCondition(
+                field = 'category',
+                equals = 'Administrative'
+            ),
+            ActivityLogAlertLeafCondition(
+                field = 'operationName',
+                equals = 'Microsoft.Compute/virtualMachineScaleSets/virtualmachines/delete'
+            ),ActivityLogAlertLeafCondition(
+                field = 'resourceGroup',
+                equals = resourceGroupName
+            ),ActivityLogAlertLeafCondition(
+                field = 'resourceProvider',
+                equals = 'Microsoft.Compute'
+            ),ActivityLogAlertLeafCondition(
+                field = 'resourceType',
+                equals = 'Microsoft.Compute/virtualMachineScaleSets/virtualMachines'
+            )
+        ]
+    )
+    activity_log_alert1 = ActivityLogAlertResource(
             location=existing_alert.location,
             scopes=existing_alert.scopes,
             actions=existing_alert.actions,
-            condition=condition
+            condition=condition1
     )
-    alert = monitor_client.activity_log_alerts.create_or_update(
+    activity_log_alert2 = ActivityLogAlertResource(
+            location=existing_alert.location,
+            scopes=existing_alert.scopes,
+            actions=existing_alert.actions,
+            condition=condition2
+    )
+    alert1 = monitor_client.activity_log_alerts.create_or_update(
         resource_group_name = resourceGroupName,
         activity_log_alert_name = new_mp_activitylog_alert_name,
-        activity_log_alert = activity_log_alert
+        activity_log_alert = activity_log_alert1
+        )
+    alert2 = monitor_client.activity_log_alerts.create_or_update(
+        resource_group_name = resourceGroupName,
+        activity_log_alert_name = new_mp_activitylog_alert_name,
+        activity_log_alert = activity_log_alert2
         )
 
 def create_autoscaling_settings(ExistingVmScaleSetName,VmScaleSetID,resourceGroupName):
