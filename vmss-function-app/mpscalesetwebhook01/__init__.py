@@ -28,21 +28,20 @@ def handle_dead_uuid(vmss_data,uuid):
     compute = ComputeManagementClient(credential,subscriptionId)
     vmScaleSetData = get_vmss_data(compute,vmScaleSetName,resourceGroupName)
     vmScaleSetTags = vmScaleSetData.tags
+    if vmss_data['disaster']:
+        correlationId = vmss_data['data']['context']['activityLog']['correlationId']
+        if uuid in vmScaleSetTags:
+            if vmScaleSetTags[uuid] == correlationId:
+                logging.info('No need to update dead_uuid_list Tag,As this is a Re-Run for correlationId:{}'.format(correlationId))
+                return True
+            else:
+                logging.info('Set Existing uuid to CorrelationID mapping ==> {}:{}'.format(uuid,correlationId))
+                vmScaleSetTags[uuid] = correlationId
+        else:
+            vmScaleSetTags[uuid] = correlationId
+            logging.info('Set uuid to CorrelationID mapping for First Time==> {}:{}'.format(uuid,correlationId))
     try:
         dead_uuid_list = vmScaleSetTags['dead_uuid_list']
-        if vmss_data['disaster']:
-            correlationId = vmss_data['data']['context']['activityLog']['correlationId']
-            if uuid in vmScaleSetTags:
-                if vmScaleSetTags[uuid] == correlationId:
-                    logging.info('No need to update dead_uuid_list Tag,As this is a Re-Run for correlationId:{}'.format(correlationId))
-                    return True
-                else:
-                    logging.info('Set Existing uuid to CorrelationID mapping ==> {}:{}'.format(uuid,correlationId))
-                    vmScaleSetTags[uuid] = correlationId
-            else:
-                vmScaleSetTags[uuid] = correlationId
-                logging.info('Set uuid to CorrelationID mapping for First Time==> {}:{}'.format(uuid,correlationId))
-        #else:
         if len(dead_uuid_list) > 0:
             dead_uuid_list = dead_uuid_list.split(',')
             dead_uuid_list.append(uuid)
