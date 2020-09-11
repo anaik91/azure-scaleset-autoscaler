@@ -67,7 +67,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             scale_operation['context'] = {
                 'subscriptionId': scale_operation['data']['context']['activityLog']['subscriptionId'],
                 'resourceGroupName': scale_operation['data']['context']['activityLog']['resourceGroupName'],
-                'resourceName': scale_operation['data']['context']['activityLog']['resourceId'].split('/')[-1],
+                'resourceName': scale_operation['data']['context']['activityLog']['resourceId'].split('/')[8],
                 'resourceRegion': os.getenv("Location")
             }
         else:
