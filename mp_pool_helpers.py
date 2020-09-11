@@ -189,8 +189,8 @@ def update_vmss(vmScaleSetName,resourceGroupName,location,custom_data,image_id):
     storage_profile = VirtualMachineScaleSetStorageProfile(image_reference=image_reference)
     virtual_machine_profile = VirtualMachineScaleSetVMProfile(
         os_profile=os_profile,
-        storage_profile=storage_profile,
-        extension_profile=extension_profile
+        storage_profile=storage_profile
+        #extension_profile=extension_profile
     )
     update_parameters = VirtualMachineScaleSet(
         location=location,
