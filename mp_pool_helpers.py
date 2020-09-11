@@ -167,6 +167,7 @@ def update_vmss_custom_data(vmScaleSetName,resourceGroupName,location,custom_dat
 def update_vmss(vmScaleSetName,resourceGroupName,location,custom_data,image_id):
     ########
     vmss_data = compute_client.virtual_machine_scale_sets.get(resourceGroupName,vmScaleSetName)
+    """
     StorageAccount = vmss_data.virtual_machine_profile.extension_profile.extensions[0].settings['StorageAccount']
     sas_token = get_sas_token(resourceGroupName,StorageAccount)
     protected_settings = {
@@ -182,6 +183,7 @@ def update_vmss(vmScaleSetName,resourceGroupName,location,custom_data,image_id):
                 
             )]
     )
+    """
     ########
     os_profile = VirtualMachineScaleSetOSProfile(
         custom_data=custom_data)
