@@ -81,9 +81,13 @@ def get_storage_account_info(resourceGroupName,storageAccount):
 def clone_activity_log(resourceGroupName,VmScaleSetID):
     activity_log_alerts = monitor_client.activity_log_alerts.list_by_resource_group(resourceGroupName)
     existing_mp_activitylog_alerts = [i.name for i in activity_log_alerts if 'mp-alert' in i.name]
-    count = len(existing_mp_activitylog_alerts) + 1
+    if len(existing_mp_activitylog_alerts) == 0:
+        logging.info("No Activity log Alerts for MP present in RG: {}".format(resourceGroupName))
+        return True
+    count = len(existing_mp_activitylog_alerts)
     existing_mp_activitylog_alert = existing_mp_activitylog_alerts[0]
-    new_mp_activitylog_alert_name = existing_mp_activitylog_alert[:-1] + str(count)
+    new_mp_activitylog_alert_name1 = existing_mp_activitylog_alert[:-1] + str(count+1)
+    new_mp_activitylog_alert_name2 = existing_mp_activitylog_alert[:-1] + str(count+2)
     existing_alert = monitor_client.activity_log_alerts.get(resourceGroupName,existing_mp_activitylog_alert)
     condition1 = ActivityLogAlertAllOfCondition(
         all_of = [
@@ -137,12 +141,12 @@ def clone_activity_log(resourceGroupName,VmScaleSetID):
     )
     alert1 = monitor_client.activity_log_alerts.create_or_update(
         resource_group_name = resourceGroupName,
-        activity_log_alert_name = new_mp_activitylog_alert_name,
+        activity_log_alert_name = new_mp_activitylog_alert_name1,
         activity_log_alert = activity_log_alert1
         )
     alert2 = monitor_client.activity_log_alerts.create_or_update(
         resource_group_name = resourceGroupName,
-        activity_log_alert_name = new_mp_activitylog_alert_name,
+        activity_log_alert_name = new_mp_activitylog_alert_name2,
         activity_log_alert = activity_log_alert2
         )
 
