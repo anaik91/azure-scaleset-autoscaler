@@ -271,6 +271,7 @@ def get_resource_group_details(resource_group):
 
     funcapp_gen = resource_client.resources.list_by_resource_group(resource_group,filter='resourceType eq \'Microsoft.Web/sites\'')
     funcapp = extract_from_resource_generator(funcapp_gen)
+    funcapp = [i for i in funcapp if '-funcapp' in i['name']]
     if len(funcapp) == 0 :
         print('Function App Not found in Resource Group - {}'.format(resource_group))
         sys.exit(1)
