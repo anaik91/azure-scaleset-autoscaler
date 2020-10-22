@@ -123,13 +123,15 @@ def clone_activity_log(resourceGroupName,VmScaleSetID):
     )
     activity_log_alert1 = ActivityLogAlertResource(
             location=existing_alert.location,
-            scopes=existing_alert.scopes,
+            #scopes=existing_alert.scopes,
+            scopes=[VmScaleSetID],
             actions=existing_alert.actions,
             condition=condition1
     )
     activity_log_alert2 = ActivityLogAlertResource(
             location=existing_alert.location,
-            scopes=existing_alert.scopes,
+            #scopes=existing_alert.scopes,
+            scopes=[VmScaleSetID],
             actions=existing_alert.actions,
             condition=condition2
     )
