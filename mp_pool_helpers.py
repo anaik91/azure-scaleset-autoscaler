@@ -262,37 +262,42 @@ def get_resource_group_details(resource_group):
     rg_id = rg.id
     data['resource_group'] = {'id':rg_id }
 
-    #credential = DefaultAzureCredential()
-    #compute = ComputeManagementClient(credentials,subscriptionId)
-    #network = NetworkManagementClient(credentials,subscriptionId)
     keyvault_gen = resource_client.resources.list_by_resource_group(resource_group,filter='resourceType eq \'Microsoft.KeyVault/vaults\'')
     keyvault = extract_from_resource_generator(keyvault_gen)
-    #print('Keyvault ===> {}\n'.format(keyvault))
-
+    if len(keyvault) == 0 :
+        print('KeyVault Not found in Resource Group - {}'.format(resource_group))
+        sys.exit(1)
     data['keyvault'] = keyvault[0]
+
     funcapp_gen = resource_client.resources.list_by_resource_group(resource_group,filter='resourceType eq \'Microsoft.Web/sites\'')
     funcapp = extract_from_resource_generator(funcapp_gen)
-    #print('Function App ===> {}\n'.format(funcapp))
-
+    if len(funcapp) == 0 :
+        print('Function App Not found in Resource Group - {}'.format(resource_group))
+        sys.exit(1)
     data['function_app'] = funcapp[0]
-    #scaleset_gen = resource_client.resources.list_by_resource_group(resource_group,filter='resourceType eq \'Microsoft.Compute/virtualMachineScaleSets\' and tagName eq \'Subtype\' and tagValue eq \'message-processor\'')
-    #scaleset_gen = resource_client.resources.list_by_resource_group(resource_group,filter='tagName eq \'Subtype\' and tagValue eq \'message-processor\'')
+
     scaleset_gen = resource_client.resources.list_by_resource_group(resource_group,filter='resourceType eq \'Microsoft.Compute/virtualMachineScaleSets\'')
     scaleset = extract_from_resource_generator(scaleset_gen)
     scaleset = [i for i in scaleset if i['tags']['Subtype'] == 'message-processor']
-    #print('Scale Sets ===> {}\n'.format(scaleset))
+    if len(scaleset) == 0 :
+        print('MP Scale Set Not found in Resource Group - {}'.format(resource_group))
+        sys.exit(1)
     data['vmss'] = scaleset[0]
 
     public_ip_gen = resource_client.resources.list_by_resource_group(resource_group,filter='resourceType eq \'Microsoft.Network/publicIPAddresses\'')
     public_ip = extract_from_resource_generator(public_ip_gen)
     app_gw_public_ip = [i for i in public_ip if 'app-gw-pip' in i['name']]
-    #print('Public IP ===> {}\n'.format(app_gw_public_ip))
+    if len(app_gw_public_ip) == 0 :
+        print('Application Gateway Not found in Resource Group - {}'.format(resource_group))
+        sys.exit(1)
     data['public_ip'] = app_gw_public_ip[0]
 
     storage_gen = resource_client.resources.list_by_resource_group(resource_group,filter='resourceType eq \'Microsoft.Storage/storageAccounts\'')
     storage = extract_from_resource_generator(storage_gen)
     storage = [i for i in storage if i['tags']['Subtype'] == 'backup']
-    #print('Scale Sets ===> {}\n'.format(scaleset))
+    if len(storage) == 0 :
+        print('Backup Storage Account Not found in Resource Group - {}.\nEnsure Subtype=backup tag is present in the Storage Account'.format(resource_group))
+        sys.exit(1)
     data['storage_accounts'] = storage[0]
     
     return data
@@ -340,20 +345,20 @@ def main():
     data = get_resource_group_details(resource_group)
     if data is None:
         print('Resource Group - {} Not found'.format(resource_group))
-        sys.exit(0)
+        sys.exit(1)
     print('Validating ImageID ...\n')
     if validate_resource_by_id(ImageID,'2016-08-30'):
         print('ImageID is Valid\n'.format(ImageID))
         pass
     else:
         print('Not a Valid ImageID - {}'.format(ImageID))
-        sys.exit(0)
+        sys.exit(1)
     print('Validating Design Time Inputs ...')
     if validate_dt_ep(dt_oauth_host,dt_apiportal_host,dt_oauth_username,dt_oauth_password):
         print('Design Time Inputs are Valid\n'.format(ImageID))
     else:
         print('Design Time Inputs are NOT Valid\n'.format(ImageID))
-        sys.exit(0)
+        sys.exit(1)
     ms_ip = get_public_ip_address(resource_group,data['public_ip']['name'])
     vault_uri = get_key_vault_uri(resource_group,data['keyvault']['name'])
     storage_account = data['storage_accounts']['name']
