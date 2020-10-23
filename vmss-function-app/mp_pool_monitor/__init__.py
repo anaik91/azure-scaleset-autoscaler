@@ -56,6 +56,7 @@ def main(mytimer: func.TimerRequest) -> None:
     resource_group = '-'.join(function_app.split('-')[:-1]) + '-rg'
     subscriptionId = os.getenv('WEBSITE_OWNER_NAME').split('+')[0]
     mp_scale_sets = get_mp_scale_sets(resource_group)
+    logging.info('mp_scale_sets : {}'.format(mp_scale_sets))
     index = 0
     for each_vmss in mp_scale_sets['vmss']:
         ip_list = get_vmss_ip_list(each_vmss['name'],resource_group)
@@ -73,6 +74,7 @@ def main(mytimer: func.TimerRequest) -> None:
         else:
             mp_scale_sets['vmss'][index]['proxy_count'] = 0
             mp_scale_sets['vmss'][index]['uuid_list'] = uuid_list
+            index += 1
     vmss_uuid_map ={ i['name']: {'proxy_count': i['proxy_count']} for i in mp_scale_sets['vmss']}
     createVMssFlag,active_vmss = check_vmss(vmss_uuid_map,ProxyCountThreshold)
     logging.info('mp_scale_sets {}'.format(mp_scale_sets))
