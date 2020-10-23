@@ -98,7 +98,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             if len(dead_mp_uuid)!=0:
                 for uuid in dead_mp_uuid:
                     logging.info("Dead Router/MP UUID {}".format(uuid))
-                    if compType == 'message-processor':
+                    if compType == 'message-processor' and scale_operation['disaster']:
                         handle_dead_uuid(scale_operation,uuid)
                     else:
                         remove_uuid.main(baseUrl,protocol,port,ms_ip,username,password,pod,compType,region,uuid,component_name)
