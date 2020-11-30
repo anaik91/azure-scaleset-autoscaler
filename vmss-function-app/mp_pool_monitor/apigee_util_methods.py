@@ -231,8 +231,9 @@ def list_dead_mp(baseUrl,username,password,pod,compType,region):
   return dead_mp_uuid
 
 def get_uuid_from_ip(baseUrl,username,password,pod,compType,region,ip):
+  print ("getting UUID for IP:  {}".format(ip))
   servers_raw = requests.get(baseUrl+"/v1/servers?pod="+pod+"&"+"type="+compType, auth=(username,password),verify=False)
-  servers_json = json.loads(servers_raw.text)
+  servers_json = servers_raw.json()
   print ("get_uuid_from_ip - IP I got {}".format(ip))
   for i in servers_json:
     if i['internalIP'] == ip:
@@ -243,12 +244,12 @@ def get_uuid_from_ip(baseUrl,username,password,pod,compType,region,ip):
 
 def get_mp_org_bindings(baseUrl,username,password,uuid):
   result = requests.get(baseUrl+"/v1/servers/" + uuid + "/bindings" , auth=(username,password),verify=False)
-  response = json.loads(result.text)
+  response = result.json()
   return response
 
 def get_org_env_proxy_count(baseUrl,username,password,org):
   result = requests.get(baseUrl+"/v1/o/"+org+"/apis",auth=(username,password),verify=False)
-  response = json.loads(result.text)
+  response = result.json()
   return len(response)
   #logger.info("POST Response {}".format(result))
   #print ("POST Response text{}".format(result.text))
