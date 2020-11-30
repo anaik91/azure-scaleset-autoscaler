@@ -23,11 +23,14 @@ def get_mp_XProperty(endpoint,access_token):
     try:
         r = requests.get(endpoint,verify=False,headers=headers)
         if r.status_code == 200:
+            return True
+            """
             data = json.loads(r.text)
             for each_property in data['d']['results']:
                 if each_property['name'] == 'apiportal.onboarding.apiruntime_prod.mps':
                     return True
             return False
+            """
         else:
             return False
     except (ConnectionError,InvalidURL):
