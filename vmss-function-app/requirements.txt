@@ -1,5 +1,5 @@
 azure-functions
-requests
+requests==2.22.0
 azure-identity==1.4.0
 azure-mgmt-keyvault==1.1.0
 azure-keyvault-secrets==4.1.0

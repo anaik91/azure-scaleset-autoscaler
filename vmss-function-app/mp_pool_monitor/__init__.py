@@ -48,7 +48,8 @@ def main(mytimer: func.TimerRequest) -> None:
     pod = os.getenv("pod")
     compType = 'message-processor'
     component_name = 'mp'
-    logging.info("Component Name {}" .format(compType))
+    logging.info("Component Name {}".format(compType))
+    logging.info("baseUrl Name {}".format(baseUrl))
     utc_timestamp = datetime.datetime.utcnow().replace(
         tzinfo=datetime.timezone.utc).isoformat()
     #logging.info('env variables {}'.format(os.environ))
@@ -60,6 +61,7 @@ def main(mytimer: func.TimerRequest) -> None:
     index = 0
     for each_vmss in mp_scale_sets['vmss']:
         ip_list = get_vmss_ip_list(each_vmss['name'],resource_group)
+        logging.info("MP IPS:  {}".format(ip_list))
         uuid_list = []
         for each_ip in ip_list:
             uuid = get_uuid_from_ip(baseUrl,username,password,pod,compType,region,each_ip)
