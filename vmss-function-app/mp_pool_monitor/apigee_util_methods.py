@@ -231,8 +231,11 @@ def list_dead_mp(baseUrl,username,password,pod,compType,region):
   return dead_mp_uuid
 
 def get_uuid_from_ip(baseUrl,username,password,pod,compType,region,ip):
-  print ("getting UUID for IP:  {}".format(ip))
+  logging.info("getting UUID for IP:  {}".format(ip))
   servers_raw = requests.get(baseUrl+"/v1/servers?pod="+pod+"&"+"type="+compType, auth=(username,password),verify=False)
+  logging.info("status_code:  {}".format(servers_raw.status_code))
+  logging.info("servers_raw text:  {}".format(servers_raw.text))
+  logging.info("servers_raw json:  {}".format(servers_raw.json()))
   servers_json = servers_raw.json()
   print ("get_uuid_from_ip - IP I got {}".format(ip))
   for i in servers_json:
