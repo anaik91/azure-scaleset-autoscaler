@@ -39,7 +39,7 @@ def get_mp_XProperty(endpoint,access_token):
 def validate_dt_ep(dt_oauth_host,dt_apiportal_host,dt_oauth_username,dt_oauth_password):
     oath_endpoint = 'https://{}/oauth/token?grant_type=client_credentials'.format(dt_oauth_host)
     dt_endpoint = 'https://{}/apiportal/operations/1.0/Configuration.svc/XPropertys'.format(dt_apiportal_host)
-    XProperty = '(\'apiportal.onboarding.apiruntime_prod.mps\')'
+    XProperty = '(\'apiportal.onboarding.APIRUNTIME.mps\')'
     access_token = get_oauth_token(oath_endpoint,dt_oauth_username,dt_oauth_password)
     if get_mp_XProperty(dt_endpoint,access_token):
         return True

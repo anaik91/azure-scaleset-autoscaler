@@ -23,7 +23,7 @@ def get_mp_XProperty(endpoint,access_token):
     if r.status_code == 200:
         data = json.loads(r.text)
         for each_property in data['d']['results']:
-            if each_property['name'] == 'apiportal.onboarding.apiruntime_prod.mps':
+            if each_property['name'] == 'apiportal.onboarding.APIRUNTIME.mps':
                 print('Existing MP UUID List ====> {}'.format(each_property['value']))
                 return True
         return False
@@ -63,10 +63,10 @@ def update_DT_mp_uuid(uuid_list):
     password = os.getenv("dt_oauth_password")
     oath_endpoint = 'https://{}/oauth/token?grant_type=client_credentials'.format(oauth_host)
     dt_endpoint = 'https://{}/apiportal/operations/1.0/Configuration.svc/XPropertys'.format(dt_host)
-    XProperty = '(\'apiportal.onboarding.apiruntime_prod.mps\')'
+    XProperty = '(\'apiportal.onboarding.APIRUNTIME.mps\')'
     access_token = get_oauth_token(oath_endpoint,username,password)
     data = {
-        'name': 'apiportal.onboarding.apiruntime_prod.mps',
+        'name': 'apiportal.onboarding.APIRUNTIME.mps',
         'value': ",".join(uuid_list)
         }
     if get_mp_XProperty(dt_endpoint,access_token):
